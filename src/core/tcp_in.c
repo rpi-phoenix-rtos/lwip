@@ -137,15 +137,16 @@ tcp_input(struct pbuf *p, struct netif *inp)
 
   tcphdr = (struct tcp_hdr *)p->payload;
 
-#if TCP_INPUT_DEBUG
+// #if TCP_INPUT_DEBUG
   tcp_debug_print(tcphdr);
-#endif
+// #endif
 
   /* Check that TCP header fits in payload */
   if (p->len < TCP_HLEN) {
     /* drop short packets */
     LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: short packet (%"U16_F" bytes) discarded\n", p->tot_len));
     TCP_STATS_INC(tcp.lenerr);
+    printf("dropped1\n");
     goto dropped;
   }
 
@@ -153,6 +154,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
   if (ip_addr_isbroadcast(ip_current_dest_addr(), ip_current_netif()) ||
       ip_addr_ismulticast(ip_current_dest_addr())) {
     TCP_STATS_INC(tcp.proterr);
+    printf("dropped2\n");
     goto dropped;
   }
 
@@ -166,6 +168,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
                                     chksum));
       tcp_debug_print(tcphdr);
       TCP_STATS_INC(tcp.chkerr);
+      printf("dropped3\n");
       goto dropped;
     }
   }
@@ -176,6 +179,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
   if ((hdrlen_bytes < TCP_HLEN) || (hdrlen_bytes > p->tot_len)) {
     LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: invalid header length (%"U16_F")\n", (u16_t)hdrlen_bytes));
     TCP_STATS_INC(tcp.lenerr);
+    printf("dropped4\n");
     goto dropped;
   }
 
@@ -209,6 +213,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
       /* drop short packets */
       LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: options overflow second pbuf (%"U16_F" bytes)\n", p->next->len));
       TCP_STATS_INC(tcp.lenerr);
+      printf("dropped5\n");
       goto dropped;
     }
 
@@ -239,6 +244,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
       /* u16_t overflow, cannot handle this */
       LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: length u16_t overflow, cannot handle this\n"));
       TCP_STATS_INC(tcp.lenerr);
+      printf("dropped6\n");
       goto dropped;
     }
   }
@@ -788,6 +794,9 @@ tcp_process(struct tcp_pcb *pcb)
   u8_t acceptable = 0;
   err_t err;
 
+  printf("siema\n");
+  printf("flags: %hhu\n", flags);
+
   err = ERR_OK;
 
   LWIP_ASSERT("tcp_process: invalid pcb", pcb != NULL);
@@ -817,12 +826,14 @@ tcp_process(struct tcp_pcb *pcb)
     }
 
     if (acceptable) {
+      printf("tcp_process: Connection RESET\n");
       LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_process: Connection RESET\n"));
       LWIP_ASSERT("tcp_input: pcb->state != CLOSED", pcb->state != CLOSED);
       recv_flags |= TF_RESET;
       tcp_clear_flags(pcb, TF_ACK_DELAY);
       return ERR_RST;
     } else {
+      printf("tcp_process: unacceptable reset\n");
       LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_process: unacceptable reset seqno %"U32_F" rcv_nxt %"U32_F"\n",
                                     seqno, pcb->rcv_nxt));
       LWIP_DEBUGF(TCP_DEBUG, ("tcp_process: unacceptable reset seqno %"U32_F" rcv_nxt %"U32_F"\n",

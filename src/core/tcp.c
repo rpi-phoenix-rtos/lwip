@@ -2408,18 +2408,21 @@ tcp_free_ooseq(struct tcp_pcb *pcb)
 void
 tcp_debug_print(struct tcp_hdr *tcphdr)
 {
-  LWIP_DEBUGF(TCP_DEBUG, ("TCP header:\n"));
-  LWIP_DEBUGF(TCP_DEBUG, ("+-------------------------------+\n"));
-  LWIP_DEBUGF(TCP_DEBUG, ("|    %5"U16_F"      |    %5"U16_F"      | (src port, dest port)\n",
-                          lwip_ntohs(tcphdr->src), lwip_ntohs(tcphdr->dest)));
-  LWIP_DEBUGF(TCP_DEBUG, ("+-------------------------------+\n"));
-  LWIP_DEBUGF(TCP_DEBUG, ("|           %010"U32_F"          | (seq no)\n",
-                          lwip_ntohl(tcphdr->seqno)));
-  LWIP_DEBUGF(TCP_DEBUG, ("+-------------------------------+\n"));
-  LWIP_DEBUGF(TCP_DEBUG, ("|           %010"U32_F"          | (ack no)\n",
-                          lwip_ntohl(tcphdr->ackno)));
-  LWIP_DEBUGF(TCP_DEBUG, ("+-------------------------------+\n"));
-  LWIP_DEBUGF(TCP_DEBUG, ("| %2"U16_F" |   |%"U16_F"%"U16_F"%"U16_F"%"U16_F"%"U16_F"%"U16_F"|     %5"U16_F"     | (hdrlen, flags (",
+  static int file_nr = 0;
+  char name[64];
+  sprintf(name, "tcp%d", file_nr++);
+  FILE *f = fopen(name, "w+");
+  printf("f: %p\n", f);
+  printf("debug printf: %s\n", name);
+  fprintf(f, "TCP header:\n");
+  fprintf(f, "+-------------------------------+\n");
+  fprintf(f, "|    %5hu      |    %5hu      | (src port, dest port)\n", lwip_ntohs(tcphdr->src), lwip_ntohs(tcphdr->dest));
+  fprintf(f, "+-------------------------------+\n");
+  fprintf(f, "|           %010u          | (seq no)\n", lwip_ntohl(tcphdr->seqno));
+  fprintf(f, "+-------------------------------+\n");
+  fprintf(f, "|           %010u          | (ack no)\n", lwip_ntohl(tcphdr->ackno));
+  fprintf(f, "+-------------------------------+\n");
+  fprintf(f, "| %2hu |   |%hu%hu%hu%hu%hu%hu|     %5hu     | (hdrlen, flags (",
                           TCPH_HDRLEN(tcphdr),
                           (u16_t)(TCPH_FLAGS(tcphdr) >> 5 & 1),
                           (u16_t)(TCPH_FLAGS(tcphdr) >> 4 & 1),
@@ -2427,13 +2430,14 @@ tcp_debug_print(struct tcp_hdr *tcphdr)
                           (u16_t)(TCPH_FLAGS(tcphdr) >> 2 & 1),
                           (u16_t)(TCPH_FLAGS(tcphdr) >> 1 & 1),
                           (u16_t)(TCPH_FLAGS(tcphdr)      & 1),
-                          lwip_ntohs(tcphdr->wnd)));
-  tcp_debug_print_flags(TCPH_FLAGS(tcphdr));
-  LWIP_DEBUGF(TCP_DEBUG, ("), win)\n"));
-  LWIP_DEBUGF(TCP_DEBUG, ("+-------------------------------+\n"));
-  LWIP_DEBUGF(TCP_DEBUG, ("|    0x%04"X16_F"     |     %5"U16_F"     | (chksum, urgp)\n",
-                          lwip_ntohs(tcphdr->chksum), lwip_ntohs(tcphdr->urgp)));
-  LWIP_DEBUGF(TCP_DEBUG, ("+-------------------------------+\n"));
+                          lwip_ntohs(tcphdr->wnd));
+  tcp_debug_print_flags2(TCPH_FLAGS(tcphdr), f);
+  fprintf(f, "), win)\n");
+  fprintf(f, "+-------------------------------+\n");
+  fprintf(f, "|    0x%04hx     |     %5hu     | (chksum, urgp)\n",
+                          lwip_ntohs(tcphdr->chksum), lwip_ntohs(tcphdr->urgp));
+  fprintf(f, "+-------------------------------+\n");
+  fclose(f);
 }
 
 /**
@@ -2480,6 +2484,36 @@ tcp_debug_print_flags(u8_t flags)
     LWIP_DEBUGF(TCP_DEBUG, ("CWR "));
   }
   LWIP_DEBUGF(TCP_DEBUG, ("\n"));
+}
+
+void
+tcp_debug_print_flags2(u8_t flags, FILE *f)
+{
+  if (flags & TCP_FIN) {
+    fprintf(f, "FIN ");
+  }
+  if (flags & TCP_SYN) {
+    fprintf(f, "SYN ");
+  }
+  if (flags & TCP_RST) {
+    fprintf(f, "RST ");
+  }
+  if (flags & TCP_PSH) {
+    fprintf(f, "PSH ");
+  }
+  if (flags & TCP_ACK) {
+    fprintf(f, "ACK ");
+  }
+  if (flags & TCP_URG) {
+    fprintf(f, "URG ");
+  }
+  if (flags & TCP_ECE) {
+    fprintf(f, "ECE ");
+  }
+  if (flags & TCP_CWR) {
+    fprintf(f, "CWR ");
+  }
+  fprintf(f, "\n");
 }
 
 /**

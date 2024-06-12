@@ -489,6 +489,7 @@ err_t tcp_recv_null(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err);
 #if TCP_DEBUG || TCP_INPUT_DEBUG || TCP_OUTPUT_DEBUG
 void tcp_debug_print(struct tcp_hdr *tcphdr);
 void tcp_debug_print_flags(u8_t flags);
+void tcp_debug_print_flags2(u8_t flags, FILE *f);
 void tcp_debug_print_state(enum tcp_state s);
 void tcp_debug_print_pcbs(void);
 s16_t tcp_pcbs_sane(void);
