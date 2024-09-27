@@ -1595,7 +1595,7 @@ lwip_netconn_do_send(void *m)
 #endif /* LWIP_UDP */
 #if LWIP_NETPACKET
         case NETCONN_NETPACKET_RAW:
-          if (msg->msg.b->netpacket_hwaddr != NULL && msg->msg.b->netpacket_hwaddr_len != 0) {
+          if (msg->msg.b->netpacket_hwaddr_len != 0) {
             err = LWIP_HOOK_NETPACKET_SENDTO(msg->conn->pcb.netpacket, msg->msg.b->p,
                                              msg->msg.b->netpacket_hwaddr, msg->msg.b->netpacket_hwaddr_len);
           } else {
