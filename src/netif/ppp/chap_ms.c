@@ -152,7 +152,7 @@ extern void set_mppe_enc_types(int, int);
 
 static void	ascii2unicode (const char[], int, u_char[]);
 static void	NTPasswordHash (u_char *, int, u_char[MD4_SIGNATURE_SIZE]);
-static void	ChallengeResponse (const u_char *, const u_char *, u_char[24]);
+static void	ChallengeResponse (const u_char *, const u_char[MD4_SIGNATURE_SIZE], u_char[24]);
 static void	ChallengeHash (const u_char[16], const u_char *, const char *, u_char[8]);
 static void	ChapMS_NT (const u_char *, const char *, int, u_char[24]);
 static void	ChapMS2_NT (const u_char *, const u_char[16], const char *, const char *, int,
@@ -872,7 +872,7 @@ static void ChapMS(ppp_pcb *pcb, const u_char *rchallenge, const char *secret, i
  */
 static void ChapMS2(ppp_pcb *pcb, const u_char *rchallenge, const u_char *PeerChallenge,
 	const char *user, const char *secret, int secret_len, unsigned char *response,
-	u_char authResponse[], int authenticator) {
+	u_char authResponse[MS_AUTH_RESPONSE_LENGTH+1], int authenticator) {
     /* ARGSUSED */
     LWIP_UNUSED_ARG(authenticator);
 #if !MPPE_SUPPORT
