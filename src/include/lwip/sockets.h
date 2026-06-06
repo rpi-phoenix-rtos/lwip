@@ -135,8 +135,8 @@ struct msghdr {
 };
 
 /* struct msghdr->msg_flags bit field values */
-#define MSG_TRUNC   0x04
-#define MSG_CTRUNC  0x08
+#define MSG_TRUNC   0x40
+#define MSG_CTRUNC  0x80
 
 /* RFC 3542, Section 20: Ancillary Data */
 struct cmsghdr {
