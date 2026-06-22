@@ -418,7 +418,12 @@ typedef struct ipv6_mreq {
 #endif /* !defined(FIONREAD) || !defined(FIONBIO) */
 
 #ifndef FIONREAD
-#define FIONREAD    _IOR('f', 127, unsigned long) /* get # bytes to read */
+/* Phoenix: int (not unsigned long) to match libphoenix <sys/ioctl.h> FIONREAD=_IOR('f',127,int).
+ * _IOR encodes sizeof(type) into the command value, so ulong(8) vs int(4) made the client's
+ * FIONREAD a DIFFERENT number than lwip_ioctl's `case FIONREAD` -> no match -> ENOSYS (Quake UDP
+ * server "ioctlsocket (FIONREAD) failed (ENOSYS)" hang at Loading). FIONBIO already matched (both
+ * ulong), which is why non-blocking worked but FIONREAD didn't. lwip_ioctl writes *((int*)argp). */
+#define FIONREAD    _IOR('f', 127, int) /* get # bytes to read */
 #endif
 #ifndef FIONBIO
 #define FIONBIO     _IOW('f', 126, unsigned long) /* set/clear non-blocking i/o */
