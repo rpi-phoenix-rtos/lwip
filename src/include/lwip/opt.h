@@ -2108,11 +2108,7 @@
  * here for compatibility.
  */
 #if !defined LWIP_FIONREAD_LINUXMODE || defined __DOXYGEN__
-/* Phoenix: default ON. The lib-lwip core (lwip-core.a) is compiled WITHOUT the port's
- * -Iinclude/default-opts, so the LWIP_FIONREAD_LINUXMODE=1 set in the port lwipopts.h does NOT
- * reach lwip_ioctl() here -> its FIONREAD case was #if'd out -> ENOSYS (Quake UDP server hang).
- * Setting the default here guarantees lwip_ioctl handles FIONREAD for UDP sockets. */
-#define LWIP_FIONREAD_LINUXMODE         1
+#define LWIP_FIONREAD_LINUXMODE         0
 #endif
 
 /**
