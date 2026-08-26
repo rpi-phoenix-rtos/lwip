@@ -287,6 +287,48 @@ recv_udp(void *arg, struct udp_pcb *pcb, struct pbuf *p,
 #endif /* LWIP_UDP */
 
 #if LWIP_TCP
+/* Streaming-RX TCP segment coalescing (gigabit-NFS Option B). DEFAULT-ON after
+ * HW validation on the real gigabit link (2026-08-26): socket-recv 22.6 -> 27.86
+ * MB/s (+23%), NFS dd read 18.9 -> 24.4 MB/s (+29%), 128 MB NFS sha256 bit-exact,
+ * 0 faults. Defined here (not only via -D) so the -Wundef -Werror build always
+ * sees a defined macro in the #if tests below. Rollback: build with
+ * `make LWIP_RECVMBOX_COALESCE=0 ...`. See docs/inprogress/gigabit-nfs-perf-decision.md. */
+#ifndef LWIP_RECVMBOX_COALESCE
+#define LWIP_RECVMBOX_COALESCE 1
+#endif
+
+#if LWIP_RECVMBOX_COALESCE
+#ifndef LWIP_RECVMBOX_COALESCE_CAP
+/* Cap the coalesced chain well under pbuf tot_len's u16_t range (65535) to
+ * avoid silent overflow, and to bound the consumer's single-copy latency.
+ * TCP_WND (~46 KB today) already bounds queued-unconsumed bytes, but this keeps
+ * the invariant explicit and safe should TCP_WND ever be raised. */
+#define LWIP_RECVMBOX_COALESCE_CAP (32 * 1024)
+#endif
+
+/* merge() for sys_mbox_trypost_coalesce: append a TCP data pbuf onto the newest
+ * queued pbuf chain. Never merge onto a close/reset/abort/error sentinel (one
+ * lwip_netconn_is_err_msg check covers all three statics), nor past the length
+ * cap. Runs under the recvmbox lock, so the queued chain is ours to extend. */
+static int
+recv_tcp_coalesce(void *tail_entry, void *new_msg)
+{
+  err_t e;
+  struct pbuf *tail, *p;
+
+  if (lwip_netconn_is_err_msg(tail_entry, &e)) {
+    return 0;
+  }
+  tail = (struct pbuf *)tail_entry;
+  p = (struct pbuf *)new_msg;
+  if ((u32_t)tail->tot_len + (u32_t)p->tot_len > LWIP_RECVMBOX_COALESCE_CAP) {
+    return 0;
+  }
+  pbuf_cat(tail, p); /* takes over p's ref; appends to the queued chain */
+  return 1;
+}
+#endif /* LWIP_RECVMBOX_COALESCE */
+
 /**
  * Receive callback function for TCP netconns.
  * Posts the packet to conn->recvmbox, but doesn't delete it on errors.
@@ -331,6 +373,33 @@ recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
     msg = LWIP_CONST_CAST(void *, &netconn_closed);
     len = 0;
   }
+
+#if LWIP_RECVMBOX_COALESCE
+  /* Streaming RX fast path: fold back-to-back TCP segments onto the newest
+   * still-queued pbuf chain instead of posting a new recvmbox entry (and waking
+   * the consumer) per segment. Only data pbufs coalesce; the close sentinel
+   * (p == NULL) always posts as its own entry via the path below. recv_avail
+   * counts bytes per segment (the consumer decrements by the whole chain's
+   * tot_len, so it balances); RCVPLUS fires only on an actual new post, to stay
+   * 1:1 with the consumer's one RCVMINUS per fetched entry -- otherwise rcvevent
+   * would leak and the socket would read as permanently ready to select/poll. */
+  if (p != NULL) {
+    int rc = sys_mbox_trypost_coalesce(&conn->recvmbox, msg, recv_tcp_coalesce);
+    if (rc == SYS_MBOX_FULL) {
+      /* don't deallocate p: it is presented to us later again from tcp_fasttmr! */
+      return ERR_MEM;
+    }
+#if LWIP_SO_RCVBUF
+    SYS_ARCH_INC(conn->recv_avail, len);
+#endif /* LWIP_SO_RCVBUF */
+    if (rc == SYS_MBOX_POSTED) {
+      /* Register event with callback (a new queued entry, matched 1:1 by the
+       * consumer's RCVMINUS). On coalesce the queued entry already counts. */
+      API_EVENT(conn, NETCONN_EVT_RCVPLUS, len);
+    }
+    return ERR_OK;
+  }
+#endif /* LWIP_RECVMBOX_COALESCE */
 
   if (sys_mbox_trypost(&conn->recvmbox, msg) != ERR_OK) {
     /* don't deallocate p: it is presented to us later again from tcp_fasttmr! */
