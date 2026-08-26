@@ -709,6 +709,13 @@ netconn_recv_data_tcp(struct netconn *conn, struct pbuf **new_buf, u8_t apiflags
   msg = NULL;
 #endif
 
+#if LWIP_INGRESS_CREDIT
+  /* The window is credited at ingress (recv_tcp); force NOAUTORCVD so the
+   * auto-recvd path below (alloc + netconn_tcp_recvd + free) is skipped as one
+   * unit -- crediting here too would double-advertise the window. */
+  apiflags |= NETCONN_NOAUTORCVD;
+#endif /* LWIP_INGRESS_CREDIT */
+
   if (!NETCONN_RECVMBOX_WAITABLE(conn)) {
     /* This only happens when calling this function more than once *after* receiving FIN */
     return ERR_CONN;

@@ -1023,10 +1023,15 @@ lwip_recv_tcp(struct lwip_sock *sock, void *mem, size_t len, int flags)
     /* @todo: do we need to support peeking more than one pbuf? */
   } while ((recv_left > 0) && !(flags & MSG_PEEK));
 lwip_recv_tcp_done:
+#if !LWIP_INGRESS_CREDIT
   if ((recvd > 0) && !(flags & MSG_PEEK)) {
     /* ensure window update after copying all data */
     netconn_tcp_recvd(sock->conn, (size_t)recvd);
   }
+#else
+  /* LWIP_INGRESS_CREDIT: the window was already credited in recv_tcp at ingress;
+   * crediting again here would double-advertise the window (overrun). */
+#endif /* !LWIP_INGRESS_CREDIT */
   sock_set_errno(sock, 0);
   return recvd;
 }

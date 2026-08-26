@@ -392,6 +392,15 @@ recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
 #if LWIP_SO_RCVBUF
     SYS_ARCH_INC(conn->recv_avail, len);
 #endif /* LWIP_SO_RCVBUF */
+#if LWIP_INGRESS_CREDIT
+    /* Credit the receive window NOW (data accepted into the recvmbox) instead of
+     * deferring to consumer time. Keeps the window continuously open so the peer
+     * streams rather than ping-ponging one credit per recv(). Only reached on a
+     * real post/coalesce (SYS_MBOX_FULL returned above without crediting, so the
+     * refused segment is not double-counted). Consumer-side credit is suppressed
+     * under this flag (see sockets.c / api_lib.c). */
+    tcp_recved(pcb, len);
+#endif /* LWIP_INGRESS_CREDIT */
     if (rc == SYS_MBOX_POSTED) {
       /* Register event with callback (a new queued entry, matched 1:1 by the
        * consumer's RCVMINUS). On coalesce the queued entry already counts. */
@@ -408,6 +417,12 @@ recv_tcp(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
 #if LWIP_SO_RCVBUF
     SYS_ARCH_INC(conn->recv_avail, len);
 #endif /* LWIP_SO_RCVBUF */
+#if LWIP_INGRESS_CREDIT
+    /* Ingress window credit for real data (len==0 for the close sentinel). */
+    if (len != 0) {
+      tcp_recved(pcb, len);
+    }
+#endif /* LWIP_INGRESS_CREDIT */
     /* Register event with callback */
     API_EVENT(conn, NETCONN_EVT_RCVPLUS, len);
   }

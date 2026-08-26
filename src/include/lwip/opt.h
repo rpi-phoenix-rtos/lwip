@@ -203,6 +203,25 @@
 #endif
 
 /**
+ * LWIP_INGRESS_CREDIT (Phoenix-RTOS RPi4 gigabit socket-recv optimization):
+ * credit the TCP receive window at INGRESS -- call tcp_recved() in recv_tcp()
+ * when a segment is posted/coalesced to the netconn recvmbox -- instead of
+ * DEFERRING the credit to when the application consumes the data
+ * (netconn_tcp_recvd, the NETCONN_NOAUTORCVD path). Deferred crediting causes a
+ * one-credit-per-recv() ping-pong that pins socket-recv throughput at
+ * TCP_WND / credit-RTT (~30 MB/s here); ingress crediting keeps the window
+ * continuously open so the sender streams. Buffering stays bounded by the
+ * recvmbox depth x the coalesce cap (mbox-full -> recv_tcp returns ERR_MEM
+ * BEFORE crediting -> lwIP refused_data self-limits). When enabled, the
+ * consumer-side credit sites (sockets.c lwip_recv_tcp, api_lib.c
+ * netconn_recv_data_tcp auto-recvd) are suppressed to avoid double-crediting
+ * (which would over-advertise the window). DEFAULT-OFF until HW-validated.
+ */
+#if !defined LWIP_INGRESS_CREDIT || defined __DOXYGEN__
+#define LWIP_INGRESS_CREDIT             0
+#endif
+
+/**
  * SYS_LIGHTWEIGHT_PROT==1: enable inter-task protection (and task-vs-interrupt
  * protection) for certain critical regions during buffer allocation, deallocation
  * and memory allocation and deallocation.
